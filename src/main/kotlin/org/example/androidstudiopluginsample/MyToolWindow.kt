@@ -1,16 +1,9 @@
 package org.example.androidstudiopluginsample
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.input.delete
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -18,6 +11,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import org.jetbrains.jewel.bridge.addComposeTab
+import org.jetbrains.jewel.foundation.ExperimentalJewelApi
 import org.jetbrains.jewel.ui.component.OutlinedButton
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.TextField
@@ -36,23 +30,29 @@ class MyToolWindowFactory : ToolWindowFactory {
     }
 }
 
+@OptIn(ExperimentalJewelApi::class)
 @Composable
 private fun MyToolWindowContent() {
-    var input1 by remember { mutableStateOf("") }
-    var input2 by remember { mutableStateOf("") }
+    val input1 = rememberTextFieldState()
+    val input2 = rememberTextFieldState()
 
-    val result = remember(input1, input2) {
-        val num1 = input1.toDoubleOrNull()
-        val num2 = input2.toDoubleOrNull()
-        when {
-            num1 == null && input1.isNotEmpty() -> "エラー: 最初の値が無効です"
-            num2 == null && input2.isNotEmpty() -> "エラー: 2番目の値が無効です"
-            num1 != null && num2 != null -> {
-                val sum = num1 + num2
-                val display = if (sum == sum.toLong().toDouble()) sum.toLong().toString() else sum.toString()
-                "結果: $display"
+    val result by remember {
+        derivedStateOf {
+            val text1 = input1.text.toString()
+            val text2 = input2.text.toString()
+            val num1 = text1.toDoubleOrNull()
+            val num2 = text2.toDoubleOrNull()
+            when {
+                num1 == null && text1.isNotEmpty() -> "エラー: 最初の値が無効です"
+                num2 == null && text2.isNotEmpty() -> "エラー: 2番目の値が無効です"
+                num1 != null && num2 != null -> {
+                    val sum = num1 + num2
+                    val display = if (sum == sum.toLong().toDouble()) sum.toLong().toString() else sum.toString()
+                    "結果: $display"
+                }
+
+                else -> "数値を入力してください"
             }
-            else -> "数値を入力してください"
         }
     }
 
@@ -64,15 +64,13 @@ private fun MyToolWindowContent() {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             TextField(
-                value = input1,
-                onValueChange = { input1 = it },
+                state = input1,
                 modifier = Modifier.width(120.dp),
                 placeholder = { Text("数値1") },
             )
             Text("+")
             TextField(
-                value = input2,
-                onValueChange = { input2 = it },
+                state = input2,
                 modifier = Modifier.width(120.dp),
                 placeholder = { Text("数値2") },
             )
@@ -82,8 +80,8 @@ private fun MyToolWindowContent() {
 
         OutlinedButton(
             onClick = {
-                input1 = ""
-                input2 = ""
+                input1.edit { delete(0, length) }
+                input2.edit { delete(0, length) }
             },
         ) { Text("クリア") }
     }
