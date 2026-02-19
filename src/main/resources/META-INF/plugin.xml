@@ -34,4 +34,12 @@
     <extensions defaultExtensionNs="org.jetbrains.kotlin">
         <supportsKotlinPluginMode supportsK1="true" supportsK2="true"/>
     </extensions>
+    <actions>
+        <action id="MyPlugin.OpenMyToolWindow"
+                class="org.example.androidstudiopluginsample.OpenMyToolWindowAction"
+                text="My Tool Window"
+                description="Opens My Tool Window">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+    </actions>
 </idea-plugin>
