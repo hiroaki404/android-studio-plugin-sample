@@ -97,7 +97,7 @@ private fun MyToolWindowContent() {
     }
 }
 
-private data class DeviceInfo(val serial: String, val state: String)
+private data class DeviceInfo(val serial: String, val state: String, val displayName: String)
 
 private fun getAdbPath(): String {
     val androidHome = System.getenv("ANDROID_HOME")
@@ -105,6 +105,36 @@ private fun getAdbPath(): String {
         ?: return "adb"
     val adbFile = java.io.File(androidHome, "platform-tools/adb")
     return if (adbFile.exists()) adbFile.absolutePath else "adb"
+}
+
+private fun runCommand(vararg args: String): String {
+    val process = GeneralCommandLine(*args).createProcess()
+    return process.inputStream.bufferedReader().readText().trim()
+}
+
+private fun getDisplayName(serial: String): String {
+    return try {
+        if (serial.startsWith("emulator-")) {
+            val avdNameOutput = runCommand(getAdbPath(), "-s", serial, "emu", "avd", "name")
+            val avdName = avdNameOutput.lines().firstOrNull { it.isNotBlank() && it.trim() != "OK" }?.trim()
+                ?: return serial
+            val configFile = java.io.File(System.getProperty("user.home"), ".android/avd/$avdName.avd/config.ini")
+            if (configFile.exists()) {
+                configFile.readLines()
+                    .firstOrNull { it.startsWith("avd.ini.displayname=") }
+                    ?.removePrefix("avd.ini.displayname=")
+                    ?: avdName.replace("_", " ")
+            } else {
+                avdName.replace("_", " ")
+            }
+        } else {
+            val manufacturer = runCommand(getAdbPath(), "-s", serial, "shell", "getprop", "ro.product.manufacturer")
+            val model = runCommand(getAdbPath(), "-s", serial, "shell", "getprop", "ro.product.model")
+            "$manufacturer $model".trim()
+        }
+    } catch (e: Exception) {
+        serial
+    }
 }
 
 private suspend fun fetchDevices(): List<DeviceInfo> = withContext(Dispatchers.IO) {
@@ -116,7 +146,12 @@ private suspend fun fetchDevices(): List<DeviceInfo> = withContext(Dispatchers.I
         .filter { it.isNotBlank() }
         .mapNotNull { line ->
             val parts = line.split("\t")
-            if (parts.size >= 2) DeviceInfo(parts[0].trim(), parts[1].trim()) else null
+            if (parts.size >= 2) {
+                val serial = parts[0].trim()
+                val state = parts[1].trim()
+                val displayName = getDisplayName(serial)
+                DeviceInfo(serial, state, displayName)
+            } else null
         }
 }
 
@@ -163,9 +198,12 @@ private fun DeviceListContent() {
             errorMessage != null -> Text(errorMessage!!)
             devices.isEmpty() -> Text("接続中のデバイスはありません")
             else -> devices.forEach { device ->
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(device.displayName)
+                        Text("[${device.state}]")
+                    }
                     Text(device.serial)
-                    Text("[${device.state}]")
                 }
             }
         }
